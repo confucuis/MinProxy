@@ -12,7 +12,7 @@ private:
 public:
     TCPServer(int port);
     ~TCPServer(void);
-    init_tcpserver(void);
-}
+    void init_tcpserver(void);
+};
 
 #endif // _SERVER_H_
