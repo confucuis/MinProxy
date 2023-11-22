@@ -27,15 +27,15 @@ int main(void)
         exit(SOCKET_ERR);
     }
 
-    // 设置套接字
+    // 设置socket信息
     struct sockaddr_in socket_address;
     socket_address.sin_family = AF_INET;
     socket_address.sin_addr.s_addr = inet_addr(SERVER_HOST);
     socket_address.sin_port = htons(SERVER_PORT);
 
     // 连接套接字
-    int c_socket = connect(sock_fd, (struct sockaddr *)&socket_address, sizeof(socket_address));
-    if (c_socket < 0)
+    int conn_fd = connect(sock_fd, (struct sockaddr *)&socket_address, sizeof(socket_address));
+    if (conn_fd < 0)
     {
         perror("连接套接字报错\n");
         close(sock_fd);
@@ -47,7 +47,7 @@ int main(void)
     if (send(sock_fd, message, strlen(message), 0) < 0)
     {
         perror("发送消息失败\n");
-        close(c_socket);
+        close(conn_fd);
         exit(SEND_ERR);
     }
 
@@ -57,7 +57,7 @@ int main(void)
     if (read_bytes < 0)
     {
         perror("接收消息失败\n");
-        close(c_socket);
+        close(conn_fd);
         exit(RECV_ERR);
     }
 

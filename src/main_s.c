@@ -27,11 +27,12 @@ int main(void)
         exit(SOCKET_ERR);
     }
 
-    // 绑定socket到地址
+    // 设置socket信息
     struct sockaddr_in socket_address;
     socket_address.sin_family = AF_INET;
     socket_address.sin_addr.s_addr = inet_addr(SERVER_HOST);
     socket_address.sin_port = htons(SERVER_PORT);
+    // 绑定socket到地址
     if (bind(sock_fd, (struct sockaddr *)&socket_address, sizeof(socket_address)) < 0)
     {
         perror("绑定socket失败\n");
@@ -75,6 +76,7 @@ int main(void)
             close(conn_fd);
             exit(RECV_ERR);
         }
+        close(conn_fd);
     }
     // 关闭套接字
     close(sock_fd);
