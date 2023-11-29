@@ -1,107 +1,91 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define BUFFER_SIZE 4096
+#include "proxy.h"
 
-typedef struct
-{
-    int server_socket;
-    int client_socket;
-    int target_socket;
-} Proxy;
+#define BUFFER 1024
 
-void error_handling(char *message)
+void error_handling(char *msg, int num, ...)
 {
-    fputs(message, stderr);
+    perror(msg);
+    // fputs(msg, stderr);
     fputc('\n', stderr);
+    va_list ap;
+    va_start(ap, num);
+    for (int i = 0; i < num; ++i)
+    {
+        close(va_arg(ap, int)); // 从可变参数列表中读取下一个整数
+    }
+    va_end(ap);
+
     exit(1);
 }
 
-void proxy_init(Proxy *proxy, char *server_ip, int server_port,
-                char *target_ip, int target_port)
+void proxy_init(Proxy *proxy)
 {
-    struct sockaddr_in serv_addr, target_addr;
+    struct sockaddr_in server_addr, target_addr;
+    // server socket
+    if ((proxy->server_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        error_handling("server socket() error", 1, proxy->server_sock);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(proxy->server_port);
+    server_addr.sin_addr.s_addr = inet_addr(proxy->server_ip);
+    if (bind(proxy->server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1)
+        error_handling("server bind() error", 1, proxy->server_sock);
+    if (listen(proxy->server_sock, 128) == -1)
+        error_handling("server listen() error", 1, proxy->server_sock);
 
-    proxy->server_socket = socket(PF_INET, SOCK_STREAM, 0);
-    if (proxy->server_socket == -1)
-        error_handling("socket() error");
-
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(server_port);
-
-    if (bind(proxy->server_socket, (struct sockaddr *)&serv_addr,
-             sizeof(serv_addr)) == -1)
-        error_handling("bind() error");
-
-    if (listen(proxy->server_socket, 5) == -1)
-        error_handling("listen() error");
-
-    proxy->client_socket = accept(proxy->server_socket, NULL, NULL);
-    if (proxy->client_socket == -1)
-        error_handling("accept() error");
-
-    proxy->target_socket = socket(PF_INET, SOCK_STREAM, 0);
-    if (proxy->target_socket == -1)
-        error_handling("socket() error");
-
-    memset(&target_addr, 0, sizeof(target_addr));
+    // target socket
+    if ((proxy->target_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        error_handling("target socket() error", 2, proxy->target_sock, proxy->server_sock);
     target_addr.sin_family = AF_INET;
-    target_addr.sin_addr.s_addr = inet_addr(target_ip);
-    target_addr.sin_port = htons(target_port);
-
-    if (connect(proxy->target_socket, (struct sockaddr *)&target_addr,
-                sizeof(target_addr)) == -1)
-        error_handling("connect() error");
+    target_addr.sin_port = htons(proxy->target_port);
+    target_addr.sin_addr.s_addr = inet_addr(proxy->target_ip);
+    while (connect(proxy->target_sock, (struct sockaddr *)&target_addr, sizeof(target_addr)) == -1)
+    // error_handling("target connect() error", 2, proxy->target_sock, proxy->server_sock);
+    {
+        printf("等待目标服务启动...\n");
+        sleep(2);
+    }
+    printf("目标服务启动成功, 地址: [%s:%d]\n", proxy->target_ip, proxy->target_port);
 }
 
 void proxy_run(Proxy *proxy)
 {
-    char buffer[BUFFER_SIZE];
+    char buffer[BUFFER];
     int recv_len;
-
-    while ((recv_len =
-                read(proxy->client_socket, buffer, sizeof(buffer))) != 0)
+    // int send_len;
+    while (1)
     {
-        if (recv_len == -1)
-            error_handling("read() error");
+        printf("等待客户端连接...\n");
+        // 等待客户端连接, 有问题(客户端连接没反应)
+        if ((proxy->client_conn = accept(proxy->server_sock, NULL, NULL)) == -1)
+            error_handling("client accept() error", 2, proxy->client_conn, proxy->server_sock);
+        printf("客户端连接成功,开始从客户端读取数据...\n");
+        while ((recv_len = read(proxy->client_conn, buffer, sizeof(buffer))) > 0)
+        {
+            printf("开始往代理服务器转发数据...\n");
+            if (write(proxy->target_sock, buffer, recv_len) == -1)
+                error_handling("target write() error", 3, proxy->target_sock, proxy->client_conn, proxy->server_sock);
+            break;
+        }
 
-        write(proxy->target_socket, buffer, recv_len);
-
-        int send_len = read(proxy->target_socket, buffer, sizeof(buffer));
-        if (send_len == -1)
-            error_handling("read() error");
-
-        write(proxy->client_socket, buffer, send_len);
+        // while ((send_len = read(proxy->target_sock, buffer, sizeof(buffer))) > 0)
+        // {
+        //     if (write(proxy->server_conn, buffer, send_len) == -1)
+        //         error_handling("client write() error", 3, proxy->target_sock, proxy->server_conn, proxy->server_sock);
+        //     break;
+        // }
     }
 }
 
-void proxy_cleanup(Proxy *proxy)
+void proxy_clean(Proxy *proxy)
 {
-    close(proxy->client_socket);
-    close(proxy->server_socket);
-    close(proxy->target_socket);
-}
-
-int main(int argc, char *argv[])
-{
-    if (argc != 4)
-    {
-        printf("Usage: %s <server_port> <target_ip> <target_port>\n",
-               argv[0]);
-        exit(1);
-    }
-
-    Proxy proxy;
-    proxy_init(&proxy, "127.0.0.1", atoi(argv[1]), argv[2], atoi(argv[3]));
-
-    proxy_run(&proxy);
-
-    proxy_cleanup(&proxy);
-
-    return 0;
+    close(proxy->server_sock);
+    close(proxy->target_sock);
+    close(proxy->client_conn);
 }
