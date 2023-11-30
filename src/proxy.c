@@ -1,11 +1,10 @@
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 
 #include "proxy.h"
+
+Proxy proxy;
 
 #define BUFFER 1024
 
@@ -51,14 +50,13 @@ void proxy_init(Proxy *proxy)
         printf("等待目标服务启动...\n");
         sleep(2);
     }
-    printf("目标服务启动成功, 地址: [%s:%d]\n", proxy->target_ip, proxy->target_port);
+    printf("连接目标服务地址: [%s:%d]\n", proxy->target_ip, proxy->target_port);
 }
 
 void proxy_run(Proxy *proxy)
 {
     char buffer[BUFFER];
-    int recv_len;
-    // int send_len;
+    ssize_t recv_len; //, send_len;
     struct sockaddr_in client_addr;
     socklen_t client_size = sizeof(client_addr);
     printf("代理服务启动地址: [%s:%d]\n", proxy->server_ip, proxy->server_port);
@@ -79,16 +77,25 @@ void proxy_run(Proxy *proxy)
 
         // while ((send_len = read(proxy->target_sock, buffer, sizeof(buffer))) > 0)
         // {
-        //     if (write(proxy->server_conn, buffer, send_len) == -1)
-        //         error_handling("client write() error", 3, proxy->target_sock, proxy->server_conn, proxy->server_sock);
+        //     printf("回写数据...\n");
+        //     if (write(proxy->server_sock, buffer, send_len) == -1)
+        //         error_handling("client write() error", 3, proxy->target_sock, proxy->server_sock, proxy->server_sock);
         //     break;
         // }
     }
 }
 
-void proxy_clean(Proxy *proxy)
+static void proxy_clean(Proxy *proxy)
 {
+    printf("进行资源回收...\n");
     close(proxy->server_sock);
     close(proxy->target_sock);
     close(proxy->client_conn);
+    printf("资源回收完毕...\n");
+}
+
+void sigint_handler(int signo)
+{
+    proxy_clean(&proxy);
+    exit(EXIT_SUCCESS);
 }

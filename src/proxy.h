@@ -3,6 +3,8 @@
 #ifndef _PROXY_H_
 #define _PROXY_H_
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 typedef struct
@@ -17,9 +19,11 @@ typedef struct
     int target_sock;
 } Proxy;
 
+extern Proxy proxy;
+
 void error_handling(char *msg, int num, ...);
 void proxy_init(Proxy *proxy);
 void proxy_run(Proxy *proxy);
-void proxy_clean(Proxy *proxy);
+void sigint_handler(int signo);
 
 #endif // _PROXY_H_
