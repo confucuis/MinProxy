@@ -59,11 +59,14 @@ void proxy_run(Proxy *proxy)
     char buffer[BUFFER];
     int recv_len;
     // int send_len;
+    struct sockaddr_in client_addr;
+    socklen_t client_size = sizeof(client_addr);
+    printf("代理服务启动地址: [%s:%d]\n", proxy->server_ip, proxy->server_port);
     while (1)
     {
         printf("等待客户端连接...\n");
-        // 等待客户端连接, 有问题(客户端连接没反应)
-        if ((proxy->client_conn = accept(proxy->server_sock, NULL, NULL)) == -1)
+        // 等待客户端连接
+        if ((proxy->client_conn = accept(proxy->server_sock, (struct sockaddr *)&client_addr, &client_size)) < 0)
             error_handling("client accept() error", 2, proxy->client_conn, proxy->server_sock);
         printf("客户端连接成功,开始从客户端读取数据...\n");
         while ((recv_len = read(proxy->client_conn, buffer, sizeof(buffer))) > 0)

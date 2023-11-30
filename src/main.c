@@ -3,7 +3,7 @@
 
 #include "proxy.h"
 
-int main(int argc, const char *argv)
+int main(int argc, const char **argv)
 {
     // if (argc != 5)
     // {
@@ -19,8 +19,6 @@ int main(int argc, const char *argv)
     proxy.target_port = 6666;
 
     proxy_init(&proxy);
-    printf("初始化代理成功!\n");
-    printf("代理服务启动地址: [%s:%d]\n", proxy.server_ip, proxy.server_port);
     proxy_run(&proxy);
     proxy_clean(&proxy);
 
